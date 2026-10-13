@@ -1,0 +1,729 @@
+<!doctype html>
+<html lang="lv">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<meta name="theme-color" content="#7c3aed" />
+<link rel="manifest" href="manifest.webmanifest" />
+<link rel="icon" href="icon.svg" />
+<meta name="mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<title>Budžets</title>
+<!-- v7: Skūča kategorija, gada pārskats, labošana/dzēšana, veidnes, bezsaistes rinda -->
+<style>
+  :root {
+    font-family: Inter, system-ui, -apple-system, sans-serif;
+    color: #111827;
+    background: #f4f4f6;
+    -webkit-tap-highlight-color: transparent;
+  }
+  * { box-sizing: border-box; margin: 0; }
+  body { max-width: 560px; margin: 0 auto; padding: 16px 14px 90px; }
+  header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px; }
+  header h1 { font-size: 22px; font-weight: 800; letter-spacing: -0.02em; }
+  .btn {
+    border: 0; border-radius: 12px; padding: 10px 16px; font-size: 15px; font-weight: 600;
+    background: #7c3aed; color: #fff; cursor: pointer; font-family: inherit;
+  }
+  .btn.secondary { background: #e5e7eb; color: #374151; }
+  .btn.small { padding: 6px 12px; font-size: 13px; }
+  .card { background: #fff; border-radius: 16px; padding: 16px; margin-bottom: 12px;
+          box-shadow: 0 1px 3px rgba(0,0,0,0.07); }
+  label { display: block; font-size: 13px; font-weight: 600; color: #6b7280; margin: 10px 0 4px; }
+  input, select {
+    width: 100%; padding: 12px; border: 1.5px solid #d1d5db; border-radius: 12px;
+    font-size: 16px; font-family: inherit; background: #fff; color: #111827;
+  }
+  input:focus, select:focus { outline: none; border-color: #7c3aed; }
+  .row { display: flex; gap: 8px; }
+  .row > * { flex: 1; }
+  .chips { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 6px; }
+  .chip {
+    padding: 8px 14px; border-radius: 999px; border: 1.5px solid #d1d5db; background: #fff;
+    font-size: 14px; font-weight: 600; cursor: pointer; font-family: inherit; color: #374151;
+  }
+  .chip.on { background: #7c3aed; border-color: #7c3aed; color: #fff; }
+  .tabs { display: flex; background: #e5e7eb; border-radius: 12px; padding: 4px; margin-bottom: 14px; }
+  .tabs button { flex: 1; border: 0; background: transparent; padding: 9px; font-size: 15px;
+    font-weight: 600; border-radius: 9px; cursor: pointer; font-family: inherit; color: #6b7280; }
+  .tabs button.on { background: #fff; color: #111827; box-shadow: 0 1px 2px rgba(0,0,0,0.1); }
+  .stats { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; text-align: center; }
+  .stats .v { font-size: 20px; font-weight: 800; }
+  .stats .l { font-size: 12px; color: #6b7280; margin-top: 2px; }
+  .bar-row { margin: 10px 0; }
+  .bar-top { display: flex; justify-content: space-between; font-size: 14px; font-weight: 600; margin-bottom: 4px; }
+  .bar { height: 10px; background: #ede9fe; border-radius: 999px; overflow: hidden; }
+  .bar > div { height: 100%; border-radius: 999px; transition: width .4s; }
+  .bar-top .over { color: #dc2626; }
+  .tx { display: flex; justify-content: space-between; align-items: center; padding: 10px 0; border-bottom: 1px solid #f3f4f6; }
+  .tx:last-child { border-bottom: 0; }
+  .tx .d { font-size: 12px; color: #9ca3af; }
+  .tx .n { font-weight: 600; font-size: 15px; }
+  .tx .a { font-weight: 800; font-size: 15px; white-space: nowrap; }
+  .inc { color: #059669; } .exp { color: #dc2626; }
+  .pill { font-size: 11px; padding: 2px 8px; border-radius: 999px; background: #f3f4f6; color: #6b7280; }
+  .muted { color: #9ca3af; font-size: 13px; }
+  .msg { padding: 12px 14px; border-radius: 12px; font-size: 14px; margin-bottom: 12px; display: none; }
+  .msg.ok { background: #d1fae5; color: #065f46; display: block; }
+  .msg.err { background: #fee2e2; color: #991b1b; display: block; }
+  .empty { text-align: center; color: #9ca3af; padding: 20px 0; font-size: 14px; }
+  .navfix { position: fixed; bottom: 0; left: 0; right: 0; display: flex; justify-content: center; padding: 10px;
+    background: linear-gradient(transparent, #f4f4f6 40%); pointer-events: none; }
+  .navfix .btn { pointer-events: auto; width: 560px; max-width: calc(100vw - 28px); padding: 14px; font-size: 16px;
+    box-shadow: 0 4px 14px rgba(124,58,237,.35); }
+  .refresh { background: none; border: 0; cursor: pointer; font-size: 18px; padding: 6px; }
+  .setup-note { font-size: 13px; color: #6b7280; line-height: 1.5; }
+  .setup-note code { background: #f3f4f6; padding: 1px 5px; border-radius: 5px; font-size: 12px; }
+  details summary { cursor: pointer; font-size: 13px; font-weight: 600; color: #7c3aed; margin-top: 8px; }
+</style>
+</head>
+<body>
+<div id="app"></div>
+<div class="navfix"><button class="btn" id="quickBtn" data-act="goplus">＋ Pierakstīt</button></div>
+
+<script>
+const DEFAULTS = { owner: "Meisswindu", repo: "obsidian-domas-utt", branch: "main", dir: "Budžets/Darījumi" };
+const KAT = ["Ēdiens", "Degviela", "Auto", "Skūča", "Komunālie", "Apdrošināšana", "Izklaide", "Sports", "Citi"];
+const AVOTI = ["Opera", "Liepāja", "Ventspils", "Cits"];
+const KAT_COLOR = { "Ēdiens":"#10b981", "Degviela":"#f59e0b", "Auto":"#78716c", "Skūča":"#14b8a6", "Komunālie":"#3b82f6", "Apdrošināšana":"#8b5cf6", "Izklaide":"#ec4899", "Sports":"#7c3aed", "Citi":"#6b7280" };
+
+let cfg = JSON.parse(localStorage.getItem("budz_cfg") || "null");
+let txs = [];
+let limits = {};
+let form = { tips: "izdevums", kategorija: "", avots: "", apraksts: "", summa: "", piezime: "", datums: todayStr() };
+let diag = { files: 0, parsed: 0, err: null };
+let view = localStorage.getItem("budz_view") || "menesis";
+let selYear = null;
+let showPresetDel = false;
+let saving = false;
+let searchQ = "";
+let selKat = null;
+
+function todayStr() { const d = new Date(); return d.getFullYear() + "-" + String(d.getMonth()+1).padStart(2,"0") + "-" + String(d.getDate()).padStart(2,"0"); }
+function fmtDate(iso) { const m = String(iso || "").match(/^(\d{4})-(\d{2})-(\d{2})$/); return m ? m[3] + "." + m[2] + "." + m[1] : String(iso || ""); }
+function esc(s) { return String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c])); }
+function monthOf(d) { return (d || "").slice(0,7); }
+
+// ---- GitHub API ----
+async function gh(path, opts = {}) {
+  const r = await fetch(`https://api.github.com/repos/${cfg.owner}/${cfg.repo}/${path}${path.includes("?") ? "&" : "?"}ref=${encodeURIComponent(cfg.branch)}`, {
+    ...opts,
+    headers: {
+      "Authorization": "Bearer " + cfg.token,
+      "Accept": "application/vnd.github+json",
+      "X-GitHub-Api-Version": "2022-11-28",
+      ...(opts.headers || {})
+    }
+  });
+  if (r.status === 401 || r.status === 403) throw new Error("Pieeja nederīga (401/403). Pārbaudi token vai repo atļaujas.");
+  if (!r.ok) { const t = await r.text(); throw new Error("GitHub kļūda " + r.status + ": " + t.slice(0,200)); }
+  return r.json();
+}
+
+async function loadData() {
+  const [files, limRaw] = await Promise.all([
+    gh("contents/" + encodePath(cfg.dir)),
+    gh("contents/" + encodePath("Budžets/Limits.md")).catch(() => null),
+  ]);
+  limits = {};
+  if (limRaw && limRaw.content) {
+    b64ToUtf8(limRaw.content).split("\n").forEach(l => {
+      const m = l.match(/^([A-Za-zĀĒĢĪĶĻŅŠŪŽāēģīķļņšūž]+):\s*([\d.]+)\s*$/);
+      if (m) limits[m[1]] = parseFloat(m[2]);
+    });
+  }
+  const top = files || [];
+  const mdFiles = top.filter(f => f.name.endsWith(".md")).map(f => f.path);
+  // month subfolders (e.g. 2026-10) — read those too
+  const subdirs = top.filter(f => f.type === "dir" && /^\d{4}-\d{2}$/.test(f.name)).map(f => f.path);
+  const subListings = await Promise.allSettled(subdirs.map(p => gh("contents/" + encodePath(p))));
+  subListings.forEach(r => { if (r.status === "fulfilled" && Array.isArray(r.value)) mdFiles.push(...r.value.filter(f => f.name.endsWith(".md")).map(f => f.path)); });
+  const list = mdFiles.slice(0, 300);
+  txs = (await Promise.allSettled(list.map(p => gh("contents/" + encodePath(p)))))
+    .map(r => r.status === "fulfilled" ? parseTx(r.value) : null).filter(Boolean)
+    .sort((a,b) => (b.datumss+"").localeCompare(a.datumss+""));
+  diag = { files: list.length, parsed: txs.length, err: null };
+  localStorage.setItem("budz_cache", JSON.stringify({ t: Date.now(), txs, limits }));
+}
+
+function encodePath(p) { return p.split("/").map(encodeURIComponent).join("/"); }
+
+function b64ToUtf8(b64) { return decodeURIComponent(escape(atob((b64 || "").replace(/\n/g, "")))); }
+
+function parseTx(file) {
+  const txt = b64ToUtf8(file.content).replace(/\r/g, "");
+  const m = txt.match(/^---\n([\s\S]*?)\n---/);
+  if (!m) return null;
+  const o = { path: file.path };
+  m[1].split("\n").forEach(l => { const i = l.indexOf(":"); if (i > 0) o[l.slice(0,i).trim()] = l.slice(i+1).trim(); });
+  if (!o.datums || o.summa == null) return null;
+  o.summa = parseFloat(o.summa);
+  o.piezime = o["piezīme"] || o.piezime || "";
+  o.datumss = o.datums;
+  o.sha = file.sha;
+  return o;
+}
+
+// ---- offline queue ----
+function getQueue() { return JSON.parse(localStorage.getItem("budz_queue") || "[]"); }
+function setQueue(q) { localStorage.setItem("budz_queue", JSON.stringify(q)); }
+function queueLen() { return getQueue().length; }
+
+async function processQueue() {
+  const q = getQueue();
+  if (q.length === 0) return 0;
+  let ok = 0, rest = [];
+  for (const item of q) {
+    try { await pushOne(item.payload, item.path, item.base, item.tries || 0); ok++; }
+    catch (e) { if (e.message.includes("Failed to fetch") || e.message.includes("NetworkError")) { rest.push({ ...item, tries: (item.tries||0)+1 }); } else { rest.push({ ...item, tries: (item.tries||0)+1 }); } }
+  }
+  setQueue(rest);
+  return ok;
+}
+
+function buildTx() {
+  const f = form;
+  if (!f.summa) return { err: "Ievadi summu!" };
+  const amount = parseFloat(f.summa.toString().replace(",", "."));
+  if (isNaN(amount)) return { err: "Ievadi summu!" };
+  if (f.tips === "izdevums") {
+    if (!f.kategorija) return { err: "Izvēlies kategoriju!" };
+    if (!f.apraksts.trim()) return { err: "Ievadi aprakstu!" };
+    return { amount,
+      name: f.apraksts.trim(),
+      fm: `---\ndatums: ${f.datums}\ntips: izdevums\nkategorija: ${f.kategorija}\napraksts: ${f.apraksts.trim()}\nsumma: ${amount}${f.piezime.trim() ? `\npiezīme: ${f.piezime.trim()}` : ""}\n---\n` };
+  } else {
+    if (!f.avots) return { err: "Izvēlies avotu!" };
+    return { amount,
+      name: f.avots,
+      fm: `---\ndatums: ${f.datums}\ntips: ienākums\navots: ${f.avots}\nsumma: ${amount}${f.piezime.trim() ? `\npiezīme: ${f.piezime.trim()}` : ""}\n---\n` };
+  }
+}
+
+// push one file to GitHub, handling name collisions; resolves when saved
+async function pushOne(fm, path, base, month, tries = 0) {
+  try {
+    await gh("contents/" + encodePath(path), { method: "PUT", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ message: "Budžeta app", content: btoa(unescape(encodeURIComponent(fm))), branch: cfg.branch }) });
+  } catch (e) {
+    if ((e.message.includes("422") || e.message.includes("sha")) && tries < 5) {
+      return pushOne(fm, `${cfg.dir}/${month}/${base} (${tries+1}).md`, base, month, tries+1);
+    }
+    throw e;
+  }
+}
+
+async function saveTx() {
+  if (saving) return; // ignore double-taps while a save is in flight
+  saving = true;
+  try { await saveTxInner(); } finally { saving = false; }
+}
+
+async function saveTxInner() {
+  const f = form;
+  const tx = buildTx();
+  if (tx.err) return showMsg(tx.err, "err");
+  const month = (f.datums || "").slice(0, 7); // YYYY-MM
+  const base = `${f.datums} ${tx.name}`.replace(/[\\/:*?"<>|]/g, "");
+  const target = (n) => `${cfg.dir}/${month}/${n}`;
+  const isEdit = !!f.editPath;
+  const msgEl = document.getElementById("msg");
+  msgEl.textContent = "⏳ Saglabāju..."; msgEl.className = "msg ok";
+
+  const isOffline = async () => { try { await pushOne(tx.fm, target(base + ".md"), base, month); return false; } catch (e) {
+    if (e.message.includes("Failed to fetch") || e.message.includes("NetworkError") || e.message.includes("Offline")) {
+      getQueue().push({ payload: tx.fm, path: target(base + ".md"), base });
+      setQueue(getQueue());
+      return true;
+    } throw e; } };
+
+  try {
+    if (isEdit) {
+      // update existing file (rename = create new + delete old)
+      const old = txs.find(t => t.path === f.editPath);
+      const newPath = target(base + ".md");
+      if (newPath !== f.editPath) {
+        await pushOne(tx.fm, newPath, base, month);
+        await gh("contents/" + encodePath(f.editPath), { method: "DELETE", headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ message: "Budžeta app: pārsaukts", sha: f.editSha, branch: cfg.branch }) });
+      } else {
+        await gh("contents/" + encodePath(f.editPath), { method: "PUT", headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ message: "Budžeta app: labots", content: btoa(unescape(encodeURIComponent(tx.fm))), sha: f.editSha, branch: cfg.branch }) });
+      }
+      form = { tips: "izdevums", kategorija: "", avots: "", apraksts: "", summa: "", piezime: "", datums: todayStr(), editPath: null, editSha: null };
+      showMsg("✅ Labojums saglabāts!", "ok");
+    } else {
+      const offl = await isOffline();
+      if (offl) { form.apraksts = ""; form.summa = ""; form.piezime = ""; render(); return showMsg("📴 Nav interneta — saglabāts bezsaistē, automātiski nosūtīs, kad būs savienojums (" + queueLen() + " rindā)", "ok"); }
+      showMsg("✅ Saglabāts!", "ok");
+      form.apraksts = ""; form.summa = ""; form.piezime = "";
+    }
+  } catch (e) {
+    return showMsg("Kļūda saglabājot: " + e.message, "err");
+  }
+  try { await loadData(); } catch (e) {}
+  render();
+}
+
+async function deleteTx(path, sha) {
+  if (!confirm("Dzēst šo ierakstu? (Git vēsturē tas paliks, varēs atgūt, ja vajag.)")) return;
+  const msgEl = document.getElementById("msg");
+  msgEl.textContent = "⏳ Dzēšu..."; msgEl.className = "msg ok";
+  try {
+    await gh("contents/" + encodePath(path), { method: "DELETE", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ message: "Budžeta app: dzēsts", sha, branch: cfg.branch }) });
+    showMsg("🗑 Ieraksts izdzēsts", "ok");
+    await loadData();
+  } catch (e) { showMsg("Kļūda dzēšot: " + e.message, "err"); }
+  render();
+}
+
+function startEdit(idx) {
+  const t = txs[idx];
+  form = { tips: t.tips, kategorija: t.kategorija || "", avots: t.avots || "", apraksts: t.apraksts || "",
+    summa: String(t.summa), piezime: t.piezime || "", datums: t.datums, editPath: t.path, editSha: t.sha };
+  view = "menesis"; localStorage.setItem("budz_view", "menesis");
+  localStorage.setItem("budz_month", monthOf(t.datums));
+  render(); scrollToForm();
+}
+
+// ---- UI ----
+function getPresets() { return JSON.parse(localStorage.getItem("budz_presets") || "[]"); }
+function savePresets(p) { localStorage.setItem("budz_presets", JSON.stringify(p)); }
+
+function showMsg(t, cls) { const el = document.getElementById("msg"); el.textContent = t; el.className = "msg " + cls; if (cls === "ok") setTimeout(() => { el.className = "msg"; }, 3500); }
+
+function savePresetFromForm() {
+  const tx = buildTx();
+  if (tx.err) return showMsg(tx.err, "err");
+  const label = (form.tips === "izdevums" ? form.apraksts.trim() : form.avots);
+  if (!label) return showMsg("Ievadi aprakstu/avotu!", "err");
+  const p = { label, tips: form.tips, kategorija: form.kategorija, avots: form.avots,
+    apraksts: form.apraksts.trim(), summa: form.summa.toString(), piezime: form.piezime.trim() };
+  const presets = getPresets();
+  if (presets.some(x => x.label === label && x.summa === p.summa)) return showMsg("Tāda veidne jau ir", "err");
+  presets.push(p); savePresets(presets);
+  showMsg("💾 Veidne saglabāta: " + label, "ok"); render();
+}
+
+function applyPreset(i) {
+  const p = getPresets()[i]; if (!p) return;
+  form = { tips: p.tips, kategorija: p.kategorija || "", avots: p.avots || "", apraksts: p.apraksts || "",
+    summa: p.summa || "", piezime: p.piezime || "", datums: todayStr(), editPath: null, editSha: null };
+  view = "menesis"; localStorage.setItem("budz_view", "menesis"); render(); scrollToForm();
+  const sum = document.getElementById("f_sum"); if (sum) sum.focus();
+}
+
+// recent distinct descriptions within the currently selected category
+function recentNames() {
+  if (form.tips !== "izdevums" || !form.kategorija) return [];
+  const seen = new Set(), out = [];
+  for (const t of txs) {
+    if (t.tips === "izdevums" && t.kategorija === form.kategorija && t.apraksts && !seen.has(t.apraksts)) {
+      seen.add(t.apraksts); out.push(t.apraksts);
+      if (out.length >= 12) break;
+    }
+  }
+  return out;
+}
+function scrollToForm() { document.getElementById("form").scrollIntoView({ behavior: "smooth" }); }
+
+function render() {
+  const app = document.getElementById("app");
+  if (!cfg || !cfg.token) { renderSetup(app); return; }
+  const months = [...new Set(txs.map(t => monthOf(t.datums)))].sort().reverse();
+  const sel = localStorage.getItem("budz_month") || monthOf(todayStr());
+  const m = months.includes(sel) ? sel : (months[0] || monthOf(todayStr()));
+  const mTxs = txs.filter(t => monthOf(t.datums) === m);
+  const inc = mTxs.filter(t => t.tips === "ienākums").reduce((s,t) => s + t.summa, 0);
+  const exp = mTxs.filter(t => t.tips === "izdevums").reduce((s,t) => s + t.summa, 0);
+  const byKat = {};
+  mTxs.filter(t => t.tips === "izdevums").forEach(t => byKat[t.kategorija || "Citi"] = (byKat[t.kategorija || "Citi"] || 0) + t.summa);
+  const kats = [...new Set([...KAT.filter(k => limits[k] != null), ...Object.keys(byKat)])];
+
+  app.innerHTML = `
+  <header>
+    <h1>💰 Budžets</h1>
+    <div style="display:flex;gap:6px">
+      <button class="refresh" title="Atjaunot" data-act="refresh">⟳</button>
+      <button class="refresh" title="Iestatījumi" data-act="settings">⚙️</button>
+    </div>
+  </header>
+  <div id="msg" class="msg"></div>
+  <div class="tabs">
+    <button class="${view==="menesis"?"on":""}" data-act="view" data-val="menesis">Mēnesis</button>
+    <button class="${view==="gads"?"on":""}" data-act="view" data-val="gads">Gads</button>
+  </div>
+  ${view === "gads" ? renderYear() : `
+  <div class="card">
+    <select id="monthsel" data-act="month">
+      ${months.map(mm => `<option value="${mm}" ${mm===m?"selected":""}>${mm}</option>`).join("") || `<option>${m}</option>`}
+    </select>
+    <div class="stats" style="margin-top:14px">
+      <div><div class="v inc">+${inc.toFixed(2)}</div><div class="l">Ienākumi</div></div>
+      <div><div class="v exp">−${exp.toFixed(2)}</div><div class="l">Izdevumi</div></div>
+      <div><div class="v" style="color:${inc-exp>=0?'#059669':'#dc2626'}">${(inc-exp).toFixed(2)}</div><div class="l">Atlikums</div></div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div style="font-weight:700;margin-bottom:4px">Pa kategorijām</div>
+    ${kats.length === 0 ? `<div class="empty">Šomēnē vēl nav izdevumu</div>` : kats.map(k => {
+      const s = byKat[k] || 0, lim = limits[k];
+      const pct = lim ? Math.min(100, s/lim*100) : 100;
+      const over = lim != null && s > lim;
+      const c = KAT_COLOR[k] || "#7c3aed";
+      return `<div class="bar-row">
+        <div class="bar-top" style="cursor:pointer" data-act="katfilter" data-val="${esc(k)}" title="Spied, lai redzētu šīs kategorijas darījumus">
+          <span>${esc(k)}${lim?` <span class="pill">limitā ${lim}</span>`:""}${selKat===k?` <span class="pill" style="background:#ede9fe;color:#7c3aed">✕</span>`:""}</span>
+        <span class="${over?"over":""}">${s.toFixed(2)}${lim!=null?` / atlicis ${(lim-s).toFixed(2)}`:""}</span></div>
+        <div class="bar"><div style="width:${pct}%;background:${over?"#dc2626":c}"></div></div>
+      </div>
+      ${selKat === k ? (() => {
+        const hits = mTxs.filter(t => t.tips === "izdevums" && (t.kategorija || "Citi") === selKat);
+        return `<div style="padding:4px 0 8px 10px;border-left:2px solid ${c}">
+        <div style="font-size:11px;color:#6b7280;margin-bottom:2px">${hits.length} darījumi · kopā <b>${hits.reduce((s,t)=>s+t.summa,0).toFixed(2)} €</b></div>
+        ${hits.map(t => `
+          <div class="tx" style="padding:4px 0">
+            <div style="min-width:0"><div class="n" style="font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(t.apraksts || t.avots)}</div>
+            <div class="d" style="font-size:11px">${fmtDate(t.datums)}${t.piezime ? ` · 💬 ${esc(t.piezime)}` : ""}</div></div>
+            <div style="display:flex;align-items:center;gap:6px">
+              <div class="a exp" style="font-size:13px">−${t.summa.toFixed(2)}</div>
+              <button class="refresh" title="Labot" data-act="edit" data-val="${txs.indexOf(t)}" style="font-size:12px;padding:3px">✏️</button>
+              <button class="refresh" title="Dzēst" data-act="del" data-val="${txs.indexOf(t)}" style="font-size:12px;padding:3px">🗑</button>
+            </div>
+          </div>`).join("")}
+        </div>`;
+      })() : ``}`;
+    }).join("")}
+  </div>
+
+  <div class="card" id="form">
+    ${getPresets().length > 0 ? `
+    <div style="font-size:12px;font-weight:700;color:#6b7280;margin-bottom:6px">ĀTRĀS VEIDNES <span class="pill" style="cursor:pointer" data-act="managepresets">labot ✎</span></div>
+    <div class="chips" style="margin-bottom:8px">${getPresets().map((p,i) => `
+      <button class="chip" data-act="preset" data-val="${i}" title="${p.tips === "izdevums" ? esc(p.kategorija) : esc(p.avots)} · ${esc(p.summa)} €">
+        ${showPresetDel ? `<span data-act="delpreset" data-val="${i}" style="color:#dc2626;font-weight:700">✕</span> ` : ""}${p.tips === "izdevums" ? "−" : "+"} ${esc(p.label)} ${p.summa ? `<b>${esc(p.summa)}€</b>` : ""}</button>`).join("")}
+    </div>` : ``}
+    ${form.editPath ? `<div style="background:#fef3c7;border-radius:10px;padding:10px 12px;font-size:13px;font-weight:600;margin-bottom:10px;display:flex;justify-content:space-between;align-items:center">
+      <span>✏️ Rediģē: ${esc(form.apraksts || form.avots)}</span>
+      <button class="btn small secondary" data-act="canceledit">Atcelt</button></div>` : ``}
+    <label style="font-size:11px;color:#9ca3af">ĀTRO MAKSĀJUMU POGAS:</label>
+    <div class="chips" style="margin-bottom:8px">
+      <button class="chip" data-act="quick" data-val="gym" title="Sports · 19.00 €">🏋️ GymLatvia 19€</button>
+      <button class="chip" data-act="quick" data-val="ire" title="Komunālie · dzīvokļa īre">🔑 Dzīvokļa īre</button>
+      <button class="chip" data-act="quick" data-val="masire" title="Auto · mašīnas īre">🚗 Mašīnas īre</button>
+      <button class="chip" data-act="quick" data-val="gaze" title="Komunālie · elektrība + dabasgāze">⚡ Gāze</button>
+      <button class="chip" data-act="quick" data-val="internets" title="Komunālie · internets">📶 Internets</button>
+    </div>
+    <div class="tabs">
+      <button class="${form.tips==="izdevums"?"on":""}" data-act="tips" data-val="izdevums">− Izdevums</button>
+      <button class="${form.tips==="ienākums"?"on":""}" data-act="tips" data-val="ienākums">＋ Ienākums</button>
+    </div>
+    ${form.tips === "izdevums" ? `
+      <label>Kategorija</label>
+      <div class="chips">${KAT.map(k => `<button class="chip ${form.kategorija===k?"on":""}" data-act="kat" data-val="${k}">${k}</button>`).join("")}</div>
+      ${recentNames().length > 0 ? `
+      <label style="font-size:11px;color:#9ca3af">Nesen lietoti šajā kategorijā — spied, lai ievietotu:</label>
+      <div class="chips">${recentNames().map(n => `<button class="chip" data-act="name" data-val="${esc(n)}" style="font-size:11px">${esc(n)}</button>`).join("")}</div>` : ``}
+      <label>Apraksts</label>
+      <input id="f_apr" value="${esc(form.apraksts)}" placeholder="piem. Lidl, degviela..." oninput="form.apraksts=this.value">
+    ` : `
+      <label>Avots</label>
+      <div class="chips">${AVOTI.map(a => `<button class="chip ${form.avots===a?"on":""}" data-act="avots" data-val="${a}">${a}</button>`).join("")}</div>
+      <input type="hidden" id="f_apr" value="${esc(form.apraksts)}">
+    `}
+    <div class="row">
+      <div><label>Summa (€)</label><input id="f_sum" type="number" step="0.01" inputmode="decimal" value="${esc(form.summa)}" oninput="form.summa=this.value" placeholder="0.00"></div>
+      <div><label>Datums</label><input type="date" value="${esc(form.datums)}" data-act="datums"></div>
+    </div>
+    <label>Piezīme (nav obligāta)</label>
+    <input id="f_piez" value="${esc(form.piezime)}" placeholder="piem. dāvana tētim, kopā ar Annu..." oninput="form.piezime=this.value">
+    ${queueLen() > 0 ? `<div class="bar-row"><span class="pill" style="background:#fef3c7;color:#92400e">📴 Rindā bezsaistē: ${queueLen()} — nosūtīs automātiski</span></div>` : ``}
+    <button class="btn" style="width:100%;margin-top:14px;padding:14px" data-act="save">${form.editPath ? "Saglabāt labojumu" : "Saglabāt"}</button>
+    ${form.editPath ? `` : `<div class="row" style="margin-top:8px">
+      <button class="btn small secondary" data-act="savepreset">💾 Veidne no šī ieraksta</button>
+    </div>`}
+  </div>
+
+  <div class="card">
+    <label>Meklēt (apraksts/avots) — visos mēnešos</label>
+    <input id="searchbox" value="${esc(searchQ)}" placeholder="piem. Juris, Neste, Bolt..." style="width:100%">
+    ${searchQ.trim() === "" ? `` : (() => {
+      const q = searchQ.trim().toLowerCase();
+      const hits = txs.filter(t => ((t.apraksts||"") + " " + (t.avots||"")).toLowerCase().includes(q));
+      const tot = hits.reduce((s,t) => s + t.summa * (t.tips === "izdevums" ? -1 : 1), 0);
+      return `
+      <div style="margin-top:10px;font-size:13px;color:#6b7280">
+        Atrasti ${hits.length} ieraksti · kopā: <b style="color:${tot<0?'#dc2626':'#059669'}">${tot.toFixed(2)} €</b>
+      </div>
+      <div style="margin-top:6px">
+      ${hits.length === 0 ? `<div class="empty">Nekas nav atrasts</div>` : hits.map(t => `
+        <div class="tx">
+          <div><div class="n">${esc(t.apraksts || t.avots)}</div>
+          <div class="d">${fmtDate(t.datums)} ${t.kategorija ? "· " + esc(t.kategorija) : ""}${t.piezime ? ` · 💬 ${esc(t.piezime)}` : ""}</div></div>
+          <div style="display:flex;align-items:center;gap:8px">
+            <div class="a ${t.tips==="ienākums"?"inc":"exp"}">${t.tips==="ienākums"?"+":"−"}${t.summa.toFixed(2)}</div>
+            <button class="refresh" title="Labot" data-act="edit" data-val="${txs.indexOf(t)}" style="font-size:14px">✏️</button>
+            <button class="refresh" title="Dzēst" data-act="del" data-val="${txs.indexOf(t)}" style="font-size:14px">🗑</button>
+          </div>
+        </div>`).join("")}
+      </div>`;
+    })()}
+  </div>
+
+  <div class="card">
+    <div style="font-weight:700;margin-bottom:4px">Darījumi (${mTxs.length})</div>
+    ${mTxs.length === 0 ? `<div class="empty">Nav ierakstu</div>` : mTxs.slice(0,400).map(t => `
+      <div class="tx">
+        <div><div class="n">${esc(t.apraksts || t.avots)}</div>
+        <div class="d">${fmtDate(t.datums)} ${t.kategorija ? "· " + esc(t.kategorija) : ""}${t.piezime ? ` · 💬 ${esc(t.piezime)}` : ""}</div></div>
+        <div style="display:flex;align-items:center;gap:8px">
+          <div class="a ${t.tips==="ienākums"?"inc":"exp"}">${t.tips==="ienākums"?"+":"−"}${t.summa.toFixed(2)}</div>
+          <button class="refresh" title="Labot" data-act="edit" data-val="${txs.indexOf(t)}" style="font-size:14px">✏️</button>
+          <button class="refresh" title="Dzēst" data-act="del" data-val="${txs.indexOf(t)}" style="font-size:14px">🗑</button>
+        </div>
+      </div>`).join("")}
+  </div>
+  `}
+  <p class="muted" style="text-align:center">Dati: GitHub · ${esc(cfg.owner)}/${esc(cfg.repo)} · zariņš ${esc(cfg.branch)}</p>
+  <p class="muted" style="text-align:center">Ielādēti ${diag.files} faili · nolasīti ${diag.parsed} darījumi${diag.err ? ` · <span style="color:#dc2626">KĻŪDA: ${esc(diag.err)}</span>` : ""}</p>`;
+}
+
+const MENESI = ["Jan","Feb","Mar","Apr","Mai","Jūn","Jūl","Aug","Sep","Okt","Nov","Dec"];
+
+function renderYear() {
+  const years = [...new Set(txs.map(t => (t.datums||"").slice(0,4)))].filter(Boolean).sort().reverse();
+  if (years.length === 0) return `<div class="card"><div class="empty">Vēl nav datu</div></div>`;
+  const y = selYear && years.includes(selYear) ? selYear : (years.includes(todayStr().slice(0,4)) ? todayStr().slice(0,4) : years[0]);
+  const yTxs = txs.filter(t => (t.datums||"").startsWith(y));
+  const yInc = yTxs.filter(t => t.tips === "ienākums").reduce((s,t) => s + t.summa, 0);
+  const yExp = yTxs.filter(t => t.tips === "izdevums").reduce((s,t) => s + t.summa, 0);
+  const ySavingsRate = yInc > 0 ? Math.round((yInc - yExp) / yInc * 100) : null;
+
+  // monthly income/expense
+  const mInc = Array(12).fill(0), mExp = Array(12).fill(0);
+  yTxs.forEach(t => { const mi = parseInt((t.datums||"").slice(5,7)) - 1; if (mi >= 0 && mi < 12) { if (t.tips === "ienākums") mInc[mi] += t.summa; else mExp[mi] += t.summa; } });
+  const maxBar = Math.max(...mInc, ...mExp, 1);
+
+  // yearly category totals
+  const yByKat = {};
+  yTxs.filter(t => t.tips === "izdevums").forEach(t => yByKat[t.kategorija || "Citi"] = (yByKat[t.kategorija || "Citi"] || 0) + t.summa);
+  const yKats = [...new Set([...KAT.filter(k => limits[k] != null), ...Object.keys(yByKat)])];
+  const yKatTotal = Object.values(yByKat).reduce((a,b)=>a+b, 0) || 1;
+
+  // top 5 biggest expenses
+  const top = yTxs.filter(t => t.tips === "izdevums").sort((a,b) => b.summa - a.summa).slice(0,5);
+
+  return `
+  <div class="card">
+    <select data-act="year">${years.map(yy => `<option value="${yy}" ${yy===y?"selected":""}>${yy}</option>`).join("")}</select>
+    <div class="stats" style="margin-top:14px">
+      <div><div class="v inc">+${yInc.toFixed(2)}</div><div class="l">Ienākumi</div></div>
+      <div><div class="v exp">−${yExp.toFixed(2)}</div><div class="l">Izdevumi</div></div>
+      <div><div class="v" style="color:${yInc-yExp>=0?'#059669':'#dc2626'}">${(yInc-yExp).toFixed(2)}</div><div class="l">Atlikums${ySavingsRate!=null?` · ${ySavingsRate}%`:""}</div></div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div style="font-weight:700;margin-bottom:10px">Pa mēnešiem <span class="pill">spied uz mēneša, lai atvērtu</span></div>
+    <div style="display:grid;grid-template-columns:repeat(12,1fr);gap:3px;align-items:end;height:90px">
+      ${mInc.map((v,i) => `<div data-act="openmonth" data-val="${y}-${String(i+1).padStart(2,"0")}" style="cursor:pointer;text-align:center" title="${MENESI[i]}: +${mInc[i].toFixed(2)} / −${mExp[i].toFixed(2)}">
+        <div style="height:${Math.max(4, mInc[i]/maxBar*60)}px;background:#10b981;border-radius:3px 3px 0 0"></div>
+        <div style="height:${Math.max(4, mExp[i]/maxBar*26)}px;background:#f87171;border-radius:0 0 3px 3px"></div>
+      </div>`).join("")}
+    </div>
+    <div style="display:grid;grid-template-columns:repeat(12,1fr);gap:3px;margin-top:4px">
+      ${MENESI.map(mm => `<div style="font-size:9px;color:#9ca3af;text-align:center">${mm}</div>`).join("")}
+    </div>
+    <div style="display:flex;gap:14px;margin-top:10px;font-size:12px;color:#6b7280">
+      <span><span style="display:inline-block;width:10px;height:10px;background:#10b981;border-radius:3px"></span> Ienākumi</span>
+      <span><span style="display:inline-block;width:10px;height:10px;background:#f87171;border-radius:3px"></span> Izdevumi</span>
+    </div>
+  </div>
+
+  <div class="card">
+    <div style="font-weight:700;margin-bottom:4px">Gada izdevumi pa kategorijām</div>
+    ${yKats.length === 0 ? `<div class="empty">Nav izdevumu</div>` : yKats.map(k => {
+      const s = yByKat[k] || 0;
+      const c = KAT_COLOR[k] || "#7c3aed";
+      return `<div class="bar-row">
+        <div class="bar-top" style="cursor:pointer" data-act="katfilter" data-val="${esc(k)}" title="Spied, lai redzētu šīs kategorijas darījumus">
+          <span>${esc(k)}${selKat===k?` <span class="pill" style="background:#ede9fe;color:#7c3aed">✕</span>`:""}</span>
+          <span>${s.toFixed(2)} € · ${Math.round(s/yKatTotal*100)}%</span></div>
+        <div class="bar"><div style="width:${s/yKatTotal*100}%;background:${c}"></div></div>
+      </div>
+      ${selKat === k ? (() => {
+        const hits = yTxs.filter(t => t.tips === "izdevums" && (t.kategorija || "Citi") === selKat);
+        return `<div style="padding:4px 0 8px 10px;border-left:2px solid ${c};max-height:260px;overflow-y:auto">
+        <div style="font-size:11px;color:#6b7280;margin-bottom:2px">${hits.length} darījumi · kopā <b>${hits.reduce((s,t)=>s+t.summa,0).toFixed(2)} €</b></div>
+        ${hits.slice(0,300).map(t => `
+          <div class="tx" style="padding:4px 0">
+            <div style="min-width:0"><div class="n" style="font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(t.apraksts || t.avots)}</div>
+            <div class="d" style="font-size:11px">${fmtDate(t.datums)}${t.piezime ? ` · 💬 ${esc(t.piezime)}` : ""}</div></div>
+            <div class="a exp" style="font-size:13px">−${t.summa.toFixed(2)}</div>
+          </div>`).join("")}
+        </div>`;
+      })() : ``}`;
+    }).join("")}
+  </div>
+
+  <div class="card">
+    <div style="font-weight:700;margin-bottom:4px">Lielākie izdevumi (${y})</div>
+    ${top.length === 0 ? `<div class="empty">Nav izdevumu</div>` : top.map(t => `
+      <div class="tx">
+        <div><div class="n">${esc(t.apraksts)}</div><div class="d">${fmtDate(t.datums)} · ${esc(t.kategorija)}</div></div>
+        <div class="a exp">−${t.summa.toFixed(2)}</div>
+      </div>`).join("")}
+  </div>`;
+}
+
+function renderSetup(app) {
+  const saved = JSON.parse(localStorage.getItem("budz_cfg") || "{}");
+  app.innerHTML = `
+  <header><h1>💰 Budžets</h1></header>
+  <div id="msg" class="msg"></div>
+  <div class="card">
+    <p class="setup-note">Šī app lasa un raksta tava Obsidian vault <b>Budžets/Darījumi</b> mapīti tieši GitHub.
+    Viss paliek Markdown — ja app kādreiz pazūd, dati paliek.<br><br>
+    <b>Kā izveidot token:</b><br>
+    1. GitHub → Settings → Developer settings → <b>Fine-grained tokens</b> → Generate.<br>
+    2. <b>Repository access:</b> tikai <code>${DEFAULTS.owner}/${DEFAULTS.repo}</code>.<br>
+    3. <b>Permissions → Contents:</b> Read and write.<br>
+    4. Token ielīmē šeit (glabājas tikai šajā pārlūkā, localStorage).</p>
+    <label>Owner</label><input id="s_owner" value="${esc(saved.owner || DEFAULTS.owner)}">
+    <label>Repo</label><input id="s_repo" value="${esc(saved.repo || DEFAULTS.repo)}">
+    <label>Zariņš (branch)</label><input id="s_branch" value="${esc(saved.branch || DEFAULTS.branch)}">
+    <label>GitHub token</label><input id="s_token" type="password" placeholder="github_pat_...">
+    <button class="btn" style="width:100%;margin-top:14px;padding:14px" onclick="doSetup()">Sākt</button>
+  </div>
+  <div class="card">
+    <p class="setup-note"><b>Piezīme:</b> vēstulē/canvas priekšskatījumā internets pie GitHub var būt bloķēts — lejupielādē HTML failu un atver to pārlūkā (dators vai telefons).</p>
+  </div>`;
+}
+
+async function doSetup() {
+  cfg = { owner: document.getElementById("s_owner").value.trim() || DEFAULTS.owner,
+          repo: document.getElementById("s_repo").value.trim() || DEFAULTS.repo,
+          branch: document.getElementById("s_branch").value.trim() || DEFAULTS.branch,
+          dir: DEFAULTS.dir,
+          token: document.getElementById("s_token").value.trim() };
+  if (!cfg.token) return showMsg("Ievadi token!", "err");
+  localStorage.setItem("budz_cfg", JSON.stringify(cfg));
+  app.innerHTML = `<p class="empty">⏳ Notiek sinhronizācija ar GitHub...</p>`;
+  try {
+    const cached = JSON.parse(localStorage.getItem("budz_cache") || "null");
+    if (cached) { txs = cached.txs || []; limits = cached.limits || {}; }
+    render();
+    await loadData(); render();
+  } catch (e) {
+    const offline = e.message.includes("Failed to fetch") || e.message.includes("NetworkError");
+    showMsg(offline
+      ? "⚠️ Neizdevās sasniegt GitHub — ja redzi šo priekšskatījumā (canvas), tas ir normāli: tas bloķē internetu. Lejupielādē HTML failu un atver to pārlūkā."
+      : "Neizdevās pieslēgties: " + e.message, "err");
+    render();
+  }
+}
+
+async function refresh() {
+  const el = document.getElementById("msg");
+  el.textContent = "⏳ Atjaunoju datus..."; el.className = "msg ok";
+  try { await loadData(); showMsg("✅ Atjaunināts!", "ok"); }
+  catch (e) { diag.err = e.message; showMsg("Kļūda: " + e.message, "err"); }
+  render();
+}
+
+const app = document.getElementById("app");
+
+// One delegated listener handles every button/chip in the app.
+document.addEventListener("click", (e) => {
+  const el = e.target.closest("[data-act]");
+  if (!el) return;
+  const act = el.dataset.act, val = el.dataset.val;
+  if (act === "tips") { form.tips = val; form.kategorija = ""; form.avots = ""; render(); }
+  else if (act === "view") { view = val; localStorage.setItem("budz_view", val); render(); }
+  else if (act === "openmonth") { view = "menesis"; localStorage.setItem("budz_view", "menesis"); localStorage.setItem("budz_month", val); render(); scrollToForm(); document.getElementById("monthsel")?.scrollIntoView({ behavior: "smooth" }); window.scrollTo({ top: 0 }); }
+  else if (act === "katfilter") {
+    const want = (selKat === val) ? null : val;
+    selKat = want;
+    const rectBefore = el.getBoundingClientRect();
+    const y = window.scrollY;
+    render();
+    if (want) {
+      const bar = document.querySelector(`[data-act="katfilter"][data-val="${CSS.escape(want)}"]`);
+      if (bar) {
+        bar.scrollIntoView({ block: "start" });
+        window.scrollBy(0, -8);
+      }
+    } else {
+      window.scrollTo(0, y + rectBefore.top - 100);
+    }
+  }
+  else if (act === "kat") { form.kategorija = val; render(); }
+  else if (act === "name") { form.apraksts = val; render(); const apr = document.getElementById("f_apr"); if (apr) apr.focus(); }
+  else if (act === "avots") { form.avots = val; render(); }
+  else if (act === "quick") {
+    if (val === "gym") {
+      form = { tips: "izdevums", kategorija: "Sports", avots: "", apraksts: "GymLatvia ikmēneša", summa: "19", piezime: "", datums: todayStr().slice(0,8) + "01", editPath: null, editSha: null };
+      saveTx(); // one tap: fills, saves, done
+    } else if (val === "ire") {
+      form = { tips: "izdevums", kategorija: "Komunālie", avots: "", apraksts: "Dzīvokļa īre", summa: "", piezime: "", datums: todayStr(), editPath: null, editSha: null };
+      render(); const s = document.getElementById("f_sum"); if (s) s.focus();
+    } else if (val === "masire") {
+      form = { tips: "izdevums", kategorija: "Auto", avots: "", apraksts: "Mašīnas īre", summa: "", piezime: "", datums: todayStr(), editPath: null, editSha: null };
+      render(); const s = document.getElementById("f_sum"); if (s) s.focus();
+    } else if (val === "gaze") {
+      form = { tips: "izdevums", kategorija: "Komunālie", avots: "", apraksts: "Elektrība + dabasgāze", summa: "", piezime: "", datums: todayStr(), editPath: null, editSha: null };
+      render(); const s = document.getElementById("f_sum"); if (s) s.focus();
+    } else if (val === "internets") {
+      form = { tips: "izdevums", kategorija: "Komunālie", avots: "", apraksts: "Internets", summa: "", piezime: "", datums: todayStr(), editPath: null, editSha: null };
+      render(); const s = document.getElementById("f_sum"); if (s) s.focus();
+    }
+  }
+  else if (act === "save") saveTx();
+  else if (act === "edit") startEdit(parseInt(val));
+  else if (act === "del") { const t = txs[parseInt(val)]; if (t) deleteTx(t.path, t.sha); }
+  else if (act === "canceledit") { form = { tips: "izdevums", kategorija: "", avots: "", apraksts: "", summa: "", piezime: "", datums: todayStr(), editPath: null, editSha: null }; render(); }
+  else if (act === "preset") applyPreset(parseInt(val));
+  else if (act === "savepreset") savePresetFromForm();
+  else if (act === "managepresets") { showPresetDel = !showPresetDel; render(); }
+  else if (act === "delpreset") { const p = getPresets(); const n = parseInt(val); if (n >= 0 && n < p.length) { p.splice(n, 1); savePresets(p); showPresetDel = false; render(); showMsg("🗑 Veidne izdzēsta", "ok"); } }
+  else if (act === "refresh") refresh();
+  else if (act === "settings") { cfg.token = null; render(); }
+  else if (act === "goplus") { if (view !== "menesis") { view = "menesis"; localStorage.setItem("budz_view", "menesis"); render(); } scrollToForm(); }
+});
+document.addEventListener("change", (e) => {
+  const el = e.target.closest("[data-act]");
+  if (!el) return;
+  if (el.dataset.act === "month") { localStorage.setItem("budz_month", el.value); render(); }
+  if (el.dataset.act === "year") { selYear = el.value; render(); }
+  if (el.dataset.act === "datums") { form.datums = el.value; }
+});
+document.addEventListener("input", (e) => {
+  if (e.target.id === "f_apr") form.apraksts = e.target.value;
+  if (e.target.id === "f_sum") form.summa = e.target.value;
+  if (e.target.id === "f_piez") form.piezime = e.target.value;
+  if (e.target.id === "searchbox") { const v = e.target.value; const pos = e.target.selectionStart; searchQ = v; render(); const sb = document.getElementById("searchbox"); if (sb) { sb.focus(); sb.setSelectionRange(pos, pos); } }
+});
+
+if (cfg && cfg.token) {
+  const cached = JSON.parse(localStorage.getItem("budz_cache") || "null");
+  if (cached) { txs = cached.txs || []; limits = cached.limits || {}; }
+  render();
+  loadData().then(render).catch(e => { diag.err = e.message; showMsg("Sinhr. kļūda: " + e.message, "err"); render(); });
+  // offline queue: retry when back online, and periodically
+  window.addEventListener("online", async () => {
+    const n = await processQueue();
+    if (n > 0) { showMsg(`✅ Nosūtīti ${n} bezsaistes ieraksti`, "ok"); await loadData(); render(); }
+  });
+  setInterval(async () => { if (queueLen() > 0 && navigator.onLine) {
+    const n = await processQueue();
+    if (n > 0) { showMsg(`✅ Nosūtīti ${n} bezsaistes ieraksti`, "ok"); await loadData(); render(); }
+  } }, 30000);
+} else { render(); }
+</script>
+<script>
+if ("serviceWorker" in navigator) { addEventListener("load", () => navigator.serviceWorker.register("sw.js").catch(() => {})); }
+</script>
+</body>
+</html>
