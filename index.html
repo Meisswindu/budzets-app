@@ -1,3 +1,4 @@
+
 <!doctype html>
 <html lang="lv">
 <head>
@@ -8,6 +9,7 @@
 <link rel="icon" href="icon.svg" />
 <meta name="mobile-web-app-capable" content="yes" />
 <meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="color-scheme" content="light dark" />
 <title>Budžets</title>
 <!-- v7: Skūča kategorija, gada pārskats, labošana/dzēšana, veidnes, bezsaistes rinda -->
 <style>
@@ -75,6 +77,30 @@
   .setup-note { font-size: 13px; color: #6b7280; line-height: 1.5; }
   .setup-note code { background: #f3f4f6; padding: 1px 5px; border-radius: 5px; font-size: 12px; }
   details summary { cursor: pointer; font-size: 13px; font-weight: 600; color: #7c3aed; margin-top: 8px; }
+  /* ---- Dark mode (follows system theme) ---- */
+  @media (prefers-color-scheme: dark) {
+    :root { color: #f3f4f6; background: #111827; }
+    body { background: #111827; }
+    .card { background: #1f2937; box-shadow: 0 1px 3px rgba(0,0,0,.4); }
+    .btn.secondary, .tabs { background: #374151; color: #f3f4f6; }
+    .btn.secondary { color: #f3f4f6; }
+    .tabs button { color: #9ca3af; }
+    .tabs button.on { background: #1f2937; color: #f9fafb; }
+    label { color: #9ca3af; }
+    input, select { background: #111827; color: #f3f4f6; border-color: #4b5563; }
+    input:focus, select:focus { border-color: #a78bfa; }
+    .chip { background: #1f2937; border-color: #4b5563; color: #e5e7eb; }
+    .chip.on { background: #7c3aed; border-color: #7c3aed; color: #fff; }
+    .tx { border-bottom-color: #374151; }
+    .bar { background: #312e81; }
+    .muted { color: #6b7280; }
+    .pill { background: #374151; color: #9ca3af; }
+    .setup-note code { background: #374151; color: #e5e7eb; }
+    .msg.ok { background: #064e3b; color: #a7f3d0; }
+    .msg.err { background: #7f1d1d; color: #fecaca; }
+    .navfix { background: linear-gradient(transparent, #111827 40%); }
+    .empty { color: #6b7280; }
+  }
 </style>
 </head>
 <body>
