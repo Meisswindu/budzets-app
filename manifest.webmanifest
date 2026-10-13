@@ -1,0 +1,10 @@
+{
+ "name": "Budžets",
+ "short_name": "Budžets",
+ "start_url": "./index.html",
+ "scope": "./",
+ "display": "standalone",
+ "background_color": "#f4f4f6",
+ "theme_color": "#7c3aed",
+ "icons": [{ "src": "icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" }]
+}
