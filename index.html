@@ -128,6 +128,7 @@ let selKat = null;
 function todayStr() { const d = new Date(); return d.getFullYear() + "-" + String(d.getMonth()+1).padStart(2,"0") + "-" + String(d.getDate()).padStart(2,"0"); }
 function fmtDate(iso) { const m = String(iso || "").match(/^(\d{4})-(\d{2})-(\d{2})$/); return m ? m[3] + "." + m[2] + "." + m[1] : String(iso || ""); }
 function esc(s) { return String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c])); }
+function clean(s) { return String(s ?? "").replace(/\[\[([^\]]+)\]\]/g, "$1").trim(); }
 function monthOf(d) { return (d || "").slice(0,7); }
 
 // ---- GitHub API ----
@@ -216,13 +217,13 @@ function buildTx() {
     if (!f.kategorija) return { err: "Izvēlies kategoriju!" };
     if (!f.apraksts.trim()) return { err: "Ievadi aprakstu!" };
     return { amount,
-      name: f.apraksts.trim(),
-      fm: `---\ndatums: ${f.datums}\ntips: izdevums\nkategorija: ${f.kategorija}\napraksts: ${f.apraksts.trim()}\nsumma: ${amount}${f.piezime.trim() ? `\npiezīme: ${f.piezime.trim()}` : ""}\n---\n` };
+      name: clean(f.apraksts),
+      fm: `---\ndatums: ${f.datums}\ntips: izdevums\nkategorija: ${f.kategorija}\napraksts: ${clean(f.apraksts)}\nsumma: ${amount}${f.piezime.trim() ? `\npiezīme: ${f.piezime.trim()}` : ""}\n---\n` };
   } else {
     if (!f.avots) return { err: "Izvēlies avotu!" };
     return { amount,
-      name: f.avots,
-      fm: `---\ndatums: ${f.datums}\ntips: ienākums\navots: ${f.avots}\nsumma: ${amount}${f.piezime.trim() ? `\npiezīme: ${f.piezime.trim()}` : ""}\n---\n` };
+      name: clean(f.avots),
+      fm: `---\ndatums: ${f.datums}\ntips: ienākums\navots: ${clean(f.avots)}\nsumma: ${amount}${f.piezime.trim() ? `\npiezīme: ${f.piezime.trim()}` : ""}\n---\n` };
   }
 }
 
@@ -314,7 +315,7 @@ function startEdit(idx) {
 }
 
 // ---- UI ----
-function getPresets() { return JSON.parse(localStorage.getItem("budz_presets") || "[]"); }
+function getPresets() { return JSON.parse(localStorage.getItem("budz_presets") || "[]").map(p => ({ ...p, apraksts: clean(p.apraksts), avots: clean(p.avots) })); }
 function savePresets(p) { localStorage.setItem("budz_presets", JSON.stringify(p)); }
 
 function showMsg(t, cls) { const el = document.getElementById("msg"); el.textContent = t; el.className = "msg " + cls; if (cls === "ok") setTimeout(() => { el.className = "msg"; }, 3500); }
@@ -322,7 +323,7 @@ function showMsg(t, cls) { const el = document.getElementById("msg"); el.textCon
 function savePresetFromForm() {
   const tx = buildTx();
   if (tx.err) return showMsg(tx.err, "err");
-  const label = (form.tips === "izdevums" ? form.apraksts.trim() : form.avots);
+  const label = (form.tips === "izdevums" ? clean(form.apraksts) : clean(form.avots));
   if (!label) return showMsg("Ievadi aprakstu/avotu!", "err");
   const p = { label, tips: form.tips, kategorija: form.kategorija, avots: form.avots,
     apraksts: form.apraksts.trim(), summa: form.summa.toString(), piezime: form.piezime.trim() };
@@ -345,8 +346,9 @@ function recentNames() {
   if (form.tips !== "izdevums" || !form.kategorija) return [];
   const seen = new Set(), out = [];
   for (const t of txs) {
-    if (t.tips === "izdevums" && t.kategorija === form.kategorija && t.apraksts && !seen.has(t.apraksts)) {
-      seen.add(t.apraksts); out.push(t.apraksts);
+    if (t.tips === "izdevums" && t.kategorija === form.kategorija && t.apraksts) {
+      const n = clean(t.apraksts); if (!n || seen.has(n)) continue;
+      seen.add(n); out.push(n);
       if (out.length >= 12) break;
     }
   }
