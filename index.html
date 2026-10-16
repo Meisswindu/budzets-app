@@ -147,11 +147,8 @@ async function gh(path, opts = {}) {
   return r.json();
 }
 
-async function loadData() {
-  const [files, limRaw] = await Promise.all([
-    gh("contents/" + encodePath(cfg.dir)),
-    gh("contents/" + encodePath("Budžets/Limits.md")).catch(() => null),
-  ]);
+async function loadData(forceScan = false) {
+  const limRaw = await gh("contents/" + encodePath("Budžets/Limits.md")).catch(() => null);
   limits = {};
   if (limRaw && limRaw.content) {
     b64ToUtf8(limRaw.content).split("\n").forEach(l => {
@@ -159,19 +156,66 @@ async function loadData() {
       if (m) limits[m[1]] = parseFloat(m[2]);
     });
   }
+  // FAST PATH: read the index file (1 request) instead of every .md file
+  if (!forceScan) {
+    const idx = await gh("contents/" + encodePath(cfg.dir + "/index.json")).catch(() => null);
+    if (idx && idx.content) {
+      try {
+        const data = JSON.parse(b64ToUtf8(idx.content));
+        if (data && Array.isArray(data.txs)) {
+          txs = data.txs.map(t => ({ piezime: "", kategorija: "", avots: "", ...t, datumss: t.datums }))
+            .sort((a,b) => (b.datumss+"").localeCompare(a.datumss+""));
+          indexSha = idx.sha;
+          diag = { files: data.txs.length, parsed: data.txs.length, err: null };
+          localStorage.setItem("budz_cache", JSON.stringify({ t: Date.now(), txs, limits }));
+          return;
+        }
+      } catch (e) { /* korrupts indekss — kritīsim uz pilnu skanu */ }
+    }
+  }
+  // SLOW PATH: scan folders (also rebuilds the index)
+  const files = await gh("contents/" + encodePath(cfg.dir));
   const top = files || [];
   const mdFiles = top.filter(f => f.name.endsWith(".md")).map(f => f.path);
   // month subfolders (e.g. 2026-10) — read those too
   const subdirs = top.filter(f => f.type === "dir" && /^\d{4}-\d{2}$/.test(f.name)).map(f => f.path);
   const subListings = await Promise.allSettled(subdirs.map(p => gh("contents/" + encodePath(p))));
   subListings.forEach(r => { if (r.status === "fulfilled" && Array.isArray(r.value)) mdFiles.push(...r.value.filter(f => f.name.endsWith(".md")).map(f => f.path)); });
-  const list = mdFiles.slice(0, 300);
+  const list = mdFiles.slice(0, 1000);
   txs = (await Promise.allSettled(list.map(p => gh("contents/" + encodePath(p)))))
     .map(r => r.status === "fulfilled" ? parseTx(r.value) : null).filter(Boolean)
     .sort((a,b) => (b.datumss+"").localeCompare(a.datumss+""));
   diag = { files: list.length, parsed: txs.length, err: null };
   localStorage.setItem("budz_cache", JSON.stringify({ t: Date.now(), txs, limits }));
+  indexSha = null;
+  try { await writeIndex(); } catch (e) { /* indeksa rakstīšana neizdevās — app turpina strādāt */ }
 }
+
+// ---- indekss (index.json) ----
+let indexSha = null;
+async function writeIndex() {
+  const payload = JSON.stringify({ updated: new Date().toISOString(),
+    txs: txs.map(t => ({ datums: t.datums, tips: t.tips, kategorija: t.kategorija || "", avots: t.avots || "", apraksts: t.apraksts || "", summa: t.summa, piezime: t.piezime || "", path: t.path, sha: t.sha })) });
+  const content = btoa(unescape(encodeURIComponent(payload)));
+  const put = (sha) => gh("contents/" + encodePath(cfg.dir + "/index.json"), { method: "PUT", headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ message: "Budžeta app: indekss", content, branch: cfg.branch, ...(sha ? { sha } : {}) }) });
+  try {
+    const r = await put(indexSha);
+    if (r && r.content && r.content.sha) indexSha = r.content.sha;
+  } catch (e) {
+    if (e.message.includes("422") || e.message.includes("sha")) {
+      const cur = await gh("contents/" + encodePath(cfg.dir + "/index.json")).catch(() => null);
+      if (cur && cur.sha) { const r = await put(cur.sha); indexSha = (r && r.content && r.content.sha) || cur.sha; }
+    } else throw e;
+  }
+}
+function upsertIndexEntry(res, f, amount, name, path) {
+  const sha = res && res.content && res.content.sha ? res.content.sha : null;
+  txs = txs.filter(t => t.path !== path);
+  txs.push({ datums: f.datums, tips: f.tips, kategorija: f.tips === "izdevums" ? f.kategorija : "", avots: f.tips === "ienākums" ? clean(f.avots) : "", apraksts: f.tips === "izdevums" ? name : "", summa: amount, piezime: f.piezime.trim(), path, sha, datumss: f.datums });
+  txs.sort((a,b) => (b.datumss+"").localeCompare(a.datumss+""));
+}
+async function saveIndexBestEffort() { try { await writeIndex(); } catch (e) {} }
 
 function encodePath(p) { return p.split("/").map(encodeURIComponent).join("/"); }
 
@@ -230,7 +274,7 @@ function buildTx() {
 // push one file to GitHub, handling name collisions; resolves when saved
 async function pushOne(fm, path, base, month, tries = 0) {
   try {
-    await gh("contents/" + encodePath(path), { method: "PUT", headers: { "Content-Type": "application/json" },
+    return await gh("contents/" + encodePath(path), { method: "PUT", headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ message: "Budžeta app", content: btoa(unescape(encodeURIComponent(fm))), branch: cfg.branch }) });
   } catch (e) {
     if ((e.message.includes("422") || e.message.includes("sha")) && tries < 5) {
@@ -257,7 +301,8 @@ async function saveTxInner() {
   const msgEl = document.getElementById("msg");
   msgEl.textContent = "⏳ Saglabāju..."; msgEl.className = "msg ok";
 
-  const isOffline = async () => { try { await pushOne(tx.fm, target(base + ".md"), base, month); return false; } catch (e) {
+  let savedRes = null;
+  const isOffline = async () => { try { savedRes = await pushOne(tx.fm, target(base + ".md"), base, month); return false; } catch (e) {
     if (e.message.includes("Failed to fetch") || e.message.includes("NetworkError") || e.message.includes("Offline")) {
       getQueue().push({ payload: tx.fm, path: target(base + ".md"), base });
       setQueue(getQueue());
@@ -267,28 +312,30 @@ async function saveTxInner() {
   try {
     if (isEdit) {
       // update existing file (rename = create new + delete old)
-      const old = txs.find(t => t.path === f.editPath);
       const newPath = target(base + ".md");
       if (newPath !== f.editPath) {
-        await pushOne(tx.fm, newPath, base, month);
+        savedRes = await pushOne(tx.fm, newPath, base, month);
         await gh("contents/" + encodePath(f.editPath), { method: "DELETE", headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ message: "Budžeta app: pārsaukts", sha: f.editSha, branch: cfg.branch }) });
+        txs = txs.filter(t => t.path !== f.editPath);
       } else {
-        await gh("contents/" + encodePath(f.editPath), { method: "PUT", headers: { "Content-Type": "application/json" },
+        savedRes = await gh("contents/" + encodePath(f.editPath), { method: "PUT", headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ message: "Budžeta app: labots", content: btoa(unescape(encodeURIComponent(tx.fm))), sha: f.editSha, branch: cfg.branch }) });
       }
+      upsertIndexEntry(savedRes, f, tx.amount, tx.name, newPath);
       form = { tips: "izdevums", kategorija: "", avots: "", apraksts: "", summa: "", piezime: "", datums: todayStr(), editPath: null, editSha: null };
       showMsg("✅ Labojums saglabāts!", "ok");
     } else {
       const offl = await isOffline();
       if (offl) { form.apraksts = ""; form.summa = ""; form.piezime = ""; render(); return showMsg("📴 Nav interneta — saglabāts bezsaistē, automātiski nosūtīs, kad būs savienojums (" + queueLen() + " rindā)", "ok"); }
+      upsertIndexEntry(savedRes, f, tx.amount, tx.name, target(base + ".md"));
       showMsg("✅ Saglabāts!", "ok");
       form.apraksts = ""; form.summa = ""; form.piezime = "";
     }
   } catch (e) {
     return showMsg("Kļūda saglabājot: " + e.message, "err");
   }
-  try { await loadData(); } catch (e) {}
+  await saveIndexBestEffort();
   render();
 }
 
@@ -300,7 +347,8 @@ async function deleteTx(path, sha) {
     await gh("contents/" + encodePath(path), { method: "DELETE", headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ message: "Budžeta app: dzēsts", sha, branch: cfg.branch }) });
     showMsg("🗑 Ieraksts izdzēsts", "ok");
-    await loadData();
+    txs = txs.filter(t => t.path !== path);
+    await saveIndexBestEffort();
   } catch (e) { showMsg("Kļūda dzēšot: " + e.message, "err"); }
   render();
 }
@@ -374,6 +422,7 @@ function render() {
     <h1>💰 Budžets</h1>
     <div style="display:flex;gap:6px">
       <button class="refresh" title="Atjaunot" data-act="refresh">⟳</button>
+      <button class="refresh" title="Pilna atjaunošana (pārskanē visus failus, ja indekss ir novecojis)" data-act="fullrefresh" style="margin-left:4px">⟳⟳</button>
       <button class="refresh" title="Iestatījumi" data-act="settings">⚙️</button>
     </div>
   </header>
@@ -653,10 +702,10 @@ async function doSetup() {
   }
 }
 
-async function refresh() {
+async function refresh(forceScan = false) {
   const el = document.getElementById("msg");
-  el.textContent = "⏳ Atjaunoju datus..."; el.className = "msg ok";
-  try { await loadData(); showMsg("✅ Atjaunināts!", "ok"); }
+  el.textContent = forceScan ? "⏳ Pilna atjaunošana (var aizņemt brīdi)..." : "⏳ Atjaunoju datus..."; el.className = "msg ok";
+  try { await loadData(forceScan); showMsg(forceScan ? "✅ Pilni dati atjaunināti!" : "✅ Atjaunināts!", "ok"); }
   catch (e) { diag.err = e.message; showMsg("Kļūda: " + e.message, "err"); }
   render();
 }
@@ -717,6 +766,7 @@ document.addEventListener("click", (e) => {
   else if (act === "managepresets") { showPresetDel = !showPresetDel; render(); }
   else if (act === "delpreset") { const p = getPresets(); const n = parseInt(val); if (n >= 0 && n < p.length) { p.splice(n, 1); savePresets(p); showPresetDel = false; render(); showMsg("🗑 Veidne izdzēsta", "ok"); } }
   else if (act === "refresh") refresh();
+  else if (act === "fullrefresh") refresh(true);
   else if (act === "settings") { cfg.token = null; render(); }
   else if (act === "goplus") { if (view !== "menesis") { view = "menesis"; localStorage.setItem("budz_view", "menesis"); render(); } scrollToForm(); }
 });
@@ -742,11 +792,11 @@ if (cfg && cfg.token) {
   // offline queue: retry when back online, and periodically
   window.addEventListener("online", async () => {
     const n = await processQueue();
-    if (n > 0) { showMsg(`✅ Nosūtīti ${n} bezsaistes ieraksti`, "ok"); await loadData(); render(); }
+    if (n > 0) { showMsg(`✅ Nosūtīti ${n} bezsaistes ieraksti`, "ok"); await loadData(true); render(); }
   });
   setInterval(async () => { if (queueLen() > 0 && navigator.onLine) {
     const n = await processQueue();
-    if (n > 0) { showMsg(`✅ Nosūtīti ${n} bezsaistes ieraksti`, "ok"); await loadData(); render(); }
+    if (n > 0) { showMsg(`✅ Nosūtīti ${n} bezsaistes ieraksti`, "ok"); await loadData(true); render(); }
   } }, 30000);
 } else { render(); }
 </script>
