@@ -427,54 +427,6 @@ function render() {
     </div>
   </header>
   <div id="msg" class="msg"></div>
-  <div class="tabs">
-    <button class="${view==="menesis"?"on":""}" data-act="view" data-val="menesis">Mēnesis</button>
-    <button class="${view==="gads"?"on":""}" data-act="view" data-val="gads">Gads</button>
-  </div>
-  ${view === "gads" ? renderYear() : `
-  <div class="card">
-    <select id="monthsel" data-act="month">
-      ${months.map(mm => `<option value="${mm}" ${mm===m?"selected":""}>${mm}</option>`).join("") || `<option>${m}</option>`}
-    </select>
-    <div class="stats" style="margin-top:14px">
-      <div><div class="v inc">+${inc.toFixed(2)}</div><div class="l">Ienākumi</div></div>
-      <div><div class="v exp">−${exp.toFixed(2)}</div><div class="l">Izdevumi</div></div>
-      <div><div class="v" style="color:${inc-exp>=0?'#059669':'#dc2626'}">${(inc-exp).toFixed(2)}</div><div class="l">Atlikums</div></div>
-    </div>
-  </div>
-
-  <div class="card">
-    <div style="font-weight:700;margin-bottom:4px">Pa kategorijām</div>
-    ${kats.length === 0 ? `<div class="empty">Šomēnē vēl nav izdevumu</div>` : kats.map(k => {
-      const s = byKat[k] || 0, lim = limits[k];
-      const pct = lim ? Math.min(100, s/lim*100) : 100;
-      const over = lim != null && s > lim;
-      const c = KAT_COLOR[k] || "#7c3aed";
-      return `<div class="bar-row">
-        <div class="bar-top" style="cursor:pointer" data-act="katfilter" data-val="${esc(k)}" title="Spied, lai redzētu šīs kategorijas darījumus">
-          <span>${esc(k)}${lim?` <span class="pill">limitā ${lim}</span>`:""}${selKat===k?` <span class="pill" style="background:#ede9fe;color:#7c3aed">✕</span>`:""}</span>
-        <span class="${over?"over":""}">${s.toFixed(2)}${lim!=null?` / atlicis ${(lim-s).toFixed(2)}`:""}</span></div>
-        <div class="bar"><div style="width:${pct}%;background:${over?"#dc2626":c}"></div></div>
-      </div>
-      ${selKat === k ? (() => {
-        const hits = mTxs.filter(t => t.tips === "izdevums" && (t.kategorija || "Citi") === selKat);
-        return `<div style="padding:4px 0 8px 10px;border-left:2px solid ${c}">
-        <div style="font-size:11px;color:#6b7280;margin-bottom:2px">${hits.length} darījumi · kopā <b>${hits.reduce((s,t)=>s+t.summa,0).toFixed(2)} €</b></div>
-        ${hits.map(t => `
-          <div class="tx" style="padding:4px 0">
-            <div style="min-width:0"><div class="n" style="font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(t.apraksts || t.avots)}</div>
-            <div class="d" style="font-size:11px">${fmtDate(t.datums)}${t.piezime ? ` · 💬 ${esc(t.piezime)}` : ""}</div></div>
-            <div style="display:flex;align-items:center;gap:6px">
-              <div class="a exp" style="font-size:13px">−${t.summa.toFixed(2)}</div>
-              <button class="refresh" title="Labot" data-act="edit" data-val="${txs.indexOf(t)}" style="font-size:12px;padding:3px">✏️</button>
-              <button class="refresh" title="Dzēst" data-act="del" data-val="${txs.indexOf(t)}" style="font-size:12px;padding:3px">🗑</button>
-            </div>
-          </div>`).join("")}
-        </div>`;
-      })() : ``}`;
-    }).join("")}
-  </div>
-
   <div class="card" id="form">
     ${getPresets().length > 0 ? `
     <div style="font-size:12px;font-weight:700;color:#6b7280;margin-bottom:6px">ĀTRĀS VEIDNES <span class="pill" style="cursor:pointer" data-act="managepresets">labot ✎</span></div>
@@ -524,34 +476,8 @@ function render() {
   </div>
 
   <div class="card">
-    <label>Meklēt (apraksts/avots) — visos mēnešos</label>
-    <input id="searchbox" value="${esc(searchQ)}" placeholder="piem. Juris, Neste, Bolt..." style="width:100%">
-    ${searchQ.trim() === "" ? `` : (() => {
-      const q = searchQ.trim().toLowerCase();
-      const hits = txs.filter(t => ((t.apraksts||"") + " " + (t.avots||"")).toLowerCase().includes(q));
-      const tot = hits.reduce((s,t) => s + t.summa * (t.tips === "izdevums" ? -1 : 1), 0);
-      return `
-      <div style="margin-top:10px;font-size:13px;color:#6b7280">
-        Atrasti ${hits.length} ieraksti · kopā: <b style="color:${tot<0?'#dc2626':'#059669'}">${tot.toFixed(2)} €</b>
-      </div>
-      <div style="margin-top:6px">
-      ${hits.length === 0 ? `<div class="empty">Nekas nav atrasts</div>` : hits.map(t => `
-        <div class="tx">
-          <div><div class="n">${esc(t.apraksts || t.avots)}</div>
-          <div class="d">${fmtDate(t.datums)} ${t.kategorija ? "· " + esc(t.kategorija) : ""}${t.piezime ? ` · 💬 ${esc(t.piezime)}` : ""}</div></div>
-          <div style="display:flex;align-items:center;gap:8px">
-            <div class="a ${t.tips==="ienākums"?"inc":"exp"}">${t.tips==="ienākums"?"+":"−"}${t.summa.toFixed(2)}</div>
-            <button class="refresh" title="Labot" data-act="edit" data-val="${txs.indexOf(t)}" style="font-size:14px">✏️</button>
-            <button class="refresh" title="Dzēst" data-act="del" data-val="${txs.indexOf(t)}" style="font-size:14px">🗑</button>
-          </div>
-        </div>`).join("")}
-      </div>`;
-    })()}
-  </div>
-
-  <div class="card">
-    <div style="font-weight:700;margin-bottom:4px">Darījumi (${mTxs.length})</div>
-    ${mTxs.length === 0 ? `<div class="empty">Nav ierakstu</div>` : mTxs.slice(0,400).map(t => `
+    <div style="font-weight:700;margin-bottom:4px">Pēdējie ieraksti</div>
+    ${txs.length === 0 ? `<div class="empty">Nav ierakstu</div>` : txs.slice(0, 10).map(t => `
       <div class="tx">
         <div><div class="n">${esc(t.apraksts || t.avots)}</div>
         <div class="d">${fmtDate(t.datums)} ${t.kategorija ? "· " + esc(t.kategorija) : ""}${t.piezime ? ` · 💬 ${esc(t.piezime)}` : ""}</div></div>
@@ -562,98 +488,11 @@ function render() {
         </div>
       </div>`).join("")}
   </div>
-  `}
   <p class="muted" style="text-align:center">Dati: GitHub · ${esc(cfg.owner)}/${esc(cfg.repo)} · zariņš ${esc(cfg.branch)}</p>
   <p class="muted" style="text-align:center">Ielādēti ${diag.files} faili · nolasīti ${diag.parsed} darījumi${diag.err ? ` · <span style="color:#dc2626">KĻŪDA: ${esc(diag.err)}</span>` : ""}</p>`;
 }
 
-const MENESI = ["Jan","Feb","Mar","Apr","Mai","Jūn","Jūl","Aug","Sep","Okt","Nov","Dec"];
 
-function renderYear() {
-  const years = [...new Set(txs.map(t => (t.datums||"").slice(0,4)))].filter(Boolean).sort().reverse();
-  if (years.length === 0) return `<div class="card"><div class="empty">Vēl nav datu</div></div>`;
-  const y = selYear && years.includes(selYear) ? selYear : (years.includes(todayStr().slice(0,4)) ? todayStr().slice(0,4) : years[0]);
-  const yTxs = txs.filter(t => (t.datums||"").startsWith(y));
-  const yInc = yTxs.filter(t => t.tips === "ienākums").reduce((s,t) => s + t.summa, 0);
-  const yExp = yTxs.filter(t => t.tips === "izdevums").reduce((s,t) => s + t.summa, 0);
-  const ySavingsRate = yInc > 0 ? Math.round((yInc - yExp) / yInc * 100) : null;
-
-  // monthly income/expense
-  const mInc = Array(12).fill(0), mExp = Array(12).fill(0);
-  yTxs.forEach(t => { const mi = parseInt((t.datums||"").slice(5,7)) - 1; if (mi >= 0 && mi < 12) { if (t.tips === "ienākums") mInc[mi] += t.summa; else mExp[mi] += t.summa; } });
-  const maxBar = Math.max(...mInc, ...mExp, 1);
-
-  // yearly category totals
-  const yByKat = {};
-  yTxs.filter(t => t.tips === "izdevums").forEach(t => yByKat[t.kategorija || "Citi"] = (yByKat[t.kategorija || "Citi"] || 0) + t.summa);
-  const yKats = [...new Set([...KAT.filter(k => limits[k] != null), ...Object.keys(yByKat)])];
-  const yKatTotal = Object.values(yByKat).reduce((a,b)=>a+b, 0) || 1;
-
-  // top 5 biggest expenses
-  const top = yTxs.filter(t => t.tips === "izdevums").sort((a,b) => b.summa - a.summa).slice(0,5);
-
-  return `
-  <div class="card">
-    <select data-act="year">${years.map(yy => `<option value="${yy}" ${yy===y?"selected":""}>${yy}</option>`).join("")}</select>
-    <div class="stats" style="margin-top:14px">
-      <div><div class="v inc">+${yInc.toFixed(2)}</div><div class="l">Ienākumi</div></div>
-      <div><div class="v exp">−${yExp.toFixed(2)}</div><div class="l">Izdevumi</div></div>
-      <div><div class="v" style="color:${yInc-yExp>=0?'#059669':'#dc2626'}">${(yInc-yExp).toFixed(2)}</div><div class="l">Atlikums${ySavingsRate!=null?` · ${ySavingsRate}%`:""}</div></div>
-    </div>
-  </div>
-
-  <div class="card">
-    <div style="font-weight:700;margin-bottom:10px">Pa mēnešiem <span class="pill">spied uz mēneša, lai atvērtu</span></div>
-    <div style="display:grid;grid-template-columns:repeat(12,1fr);gap:3px;align-items:end;height:90px">
-      ${mInc.map((v,i) => `<div data-act="openmonth" data-val="${y}-${String(i+1).padStart(2,"0")}" style="cursor:pointer;text-align:center" title="${MENESI[i]}: +${mInc[i].toFixed(2)} / −${mExp[i].toFixed(2)}">
-        <div style="height:${Math.max(4, mInc[i]/maxBar*60)}px;background:#10b981;border-radius:3px 3px 0 0"></div>
-        <div style="height:${Math.max(4, mExp[i]/maxBar*26)}px;background:#f87171;border-radius:0 0 3px 3px"></div>
-      </div>`).join("")}
-    </div>
-    <div style="display:grid;grid-template-columns:repeat(12,1fr);gap:3px;margin-top:4px">
-      ${MENESI.map(mm => `<div style="font-size:9px;color:#9ca3af;text-align:center">${mm}</div>`).join("")}
-    </div>
-    <div style="display:flex;gap:14px;margin-top:10px;font-size:12px;color:#6b7280">
-      <span><span style="display:inline-block;width:10px;height:10px;background:#10b981;border-radius:3px"></span> Ienākumi</span>
-      <span><span style="display:inline-block;width:10px;height:10px;background:#f87171;border-radius:3px"></span> Izdevumi</span>
-    </div>
-  </div>
-
-  <div class="card">
-    <div style="font-weight:700;margin-bottom:4px">Gada izdevumi pa kategorijām</div>
-    ${yKats.length === 0 ? `<div class="empty">Nav izdevumu</div>` : yKats.map(k => {
-      const s = yByKat[k] || 0;
-      const c = KAT_COLOR[k] || "#7c3aed";
-      return `<div class="bar-row">
-        <div class="bar-top" style="cursor:pointer" data-act="katfilter" data-val="${esc(k)}" title="Spied, lai redzētu šīs kategorijas darījumus">
-          <span>${esc(k)}${selKat===k?` <span class="pill" style="background:#ede9fe;color:#7c3aed">✕</span>`:""}</span>
-          <span>${s.toFixed(2)} € · ${Math.round(s/yKatTotal*100)}%</span></div>
-        <div class="bar"><div style="width:${s/yKatTotal*100}%;background:${c}"></div></div>
-      </div>
-      ${selKat === k ? (() => {
-        const hits = yTxs.filter(t => t.tips === "izdevums" && (t.kategorija || "Citi") === selKat);
-        return `<div style="padding:4px 0 8px 10px;border-left:2px solid ${c};max-height:260px;overflow-y:auto">
-        <div style="font-size:11px;color:#6b7280;margin-bottom:2px">${hits.length} darījumi · kopā <b>${hits.reduce((s,t)=>s+t.summa,0).toFixed(2)} €</b></div>
-        ${hits.slice(0,300).map(t => `
-          <div class="tx" style="padding:4px 0">
-            <div style="min-width:0"><div class="n" style="font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(t.apraksts || t.avots)}</div>
-            <div class="d" style="font-size:11px">${fmtDate(t.datums)}${t.piezime ? ` · 💬 ${esc(t.piezime)}` : ""}</div></div>
-            <div class="a exp" style="font-size:13px">−${t.summa.toFixed(2)}</div>
-          </div>`).join("")}
-        </div>`;
-      })() : ``}`;
-    }).join("")}
-  </div>
-
-  <div class="card">
-    <div style="font-weight:700;margin-bottom:4px">Lielākie izdevumi (${y})</div>
-    ${top.length === 0 ? `<div class="empty">Nav izdevumu</div>` : top.map(t => `
-      <div class="tx">
-        <div><div class="n">${esc(t.apraksts)}</div><div class="d">${fmtDate(t.datums)} · ${esc(t.kategorija)}</div></div>
-        <div class="a exp">−${t.summa.toFixed(2)}</div>
-      </div>`).join("")}
-  </div>`;
-}
 
 function renderSetup(app) {
   const saved = JSON.parse(localStorage.getItem("budz_cfg") || "{}");
