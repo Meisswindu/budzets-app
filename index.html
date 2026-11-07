@@ -481,7 +481,7 @@ function render() {
     ${txs.length === 0 ? `<div class="empty">Nav ierakstu</div>` : txs.slice(0, 15).map(t => `
       <div class="tx">
         <div><div class="n">${esc(t.apraksts || t.avots)}${t.tips === "izdevums" && (t.kategorija === "Cits" || !t.kategorija) ? ` <span class="pill" style="background:#fef3c7;color:#92400e">⚠️ Cits</span>` : ""}</div>
-        <div class="d">${fmtDate(t.datums)} ${t.kategorija && t.kategorija !== "Cits" ? "· " + esc(t.kategorija) : ""}${t.piezime ? ` · 💬 ${esc(t.piezime)}` : ""}</div></div>
+        <div class="d">${fmtDate(t.datums)}${t.laiks ? ` <span style="font-size:10px;opacity:.8">${esc(t.laiks)}</span>` : ""} ${t.kategorija && t.kategorija !== "Cits" ? "· " + esc(t.kategorija) : ""}${t.piezime ? ` · 💬 ${esc(t.piezime)}` : ""}</div></div>
         <div style="display:flex;align-items:center;gap:6px">
           <div class="a ${t.tips==="ienākums"?"inc":"exp"}">${t.tips==="ienākums"?"+":"−"}${t.summa.toFixed(2)}</div>
           <button class="refresh" title="Labot" data-act="edit" data-val="${txs.indexOf(t)}" style="font-size:17px;padding:8px">✏️</button>
