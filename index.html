@@ -1,4 +1,3 @@
-
 <!doctype html>
 <html lang="lv">
 <head>
@@ -10,7 +9,7 @@
 <meta name="mobile-web-app-capable" content="yes" />
 <meta name="apple-mobile-web-app-capable" content="yes" />
 <title>Budžets</title>
-<!-- v13: jaunā kategoriju shēma 2026-11-09: Pārtika/Āra ēdiens/Dāvanas/Stāvvietas & Mobilly/Māja & remonts/Undīne; Sports izņemts (Gym→Abonementi); Ēdiens izņemts -->
+<!-- v14: jaunas kategorijas Darbs/Mūzika un Veselība (2026-11-12, gada backfill) -->
 <style>
   :root {
     font-family: Inter, system-ui, -apple-system, sans-serif;
@@ -86,9 +85,9 @@
 
 <script>
 const DEFAULTS = { owner: "Meisswindu", repo: "obsidian-domas-utt", branch: "main", dir: "Budžets/Darījumi" };
-const KAT = ["Pārtika", "Āra ēdiens", "Dāvanas", "Degviela", "Auto", "Transports", "Stāvvietas & Mobilly", "Skūča", "Komunālie", "Māja & remonts", "Abonementi", "Apdrošināšana", "Izklaide", "Undīne", "Citi"];
+const KAT = ["Pārtika", "Āra ēdiens", "Dāvanas", "Degviela", "Auto", "Transports", "Stāvvietas & Mobilly", "Skūča", "Komunālie", "Māja & remonts", "Abonementi", "Apdrošināšana", "Izklaide", "Darbs/Mūzika", "Veselība", "Undīne", "Citi"];
 const AVOTI = ["Opera", "Liepāja", "Ventspils", "Cits"];
-const KAT_COLOR = { "Pārtika":"#10b981", "Āra ēdiens":"#22c55e", "Dāvanas":"#f472b6", "Degviela":"#f59e0b", "Auto":"#78716c", "Transports":"#0ea5e9", "Stāvvietas & Mobilly":"#38bdf8", "Skūča":"#14b8a6", "Komunālie":"#3b82f6", "Māja & remonts":"#a16207", "Abonementi":"#f97316", "Apdrošināšana":"#8b5cf6", "Izklaide":"#ec4899", "Undīne":"#e879f9", "Citi":"#6b7280" };
+const KAT_COLOR = { "Pārtika":"#10b981", "Āra ēdiens":"#22c55e", "Dāvanas":"#f472b6", "Degviela":"#f59e0b", "Auto":"#78716c", "Transports":"#0ea5e9", "Stāvvietas & Mobilly":"#38bdf8", "Skūča":"#14b8a6", "Komunālie":"#3b82f6", "Māja & remonts":"#a16207", "Abonementi":"#f97316", "Apdrošināšana":"#8b5cf6", "Izklaide":"#ec4899", "Darbs/Mūzika":"#eab308", "Veselība":"#06b6d4", "Undīne":"#e879f9", "Citi":"#6b7280" };
 
 let cfg = JSON.parse(localStorage.getItem("budz_cfg") || "null");
 let txs = [];
